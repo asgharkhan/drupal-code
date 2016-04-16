@@ -1,0 +1,5 @@
+name = Saneable Services
+description = Saneable web services for other devices.
+core = 7.x
+dependencies[] = services
+dependencies[] = saneable_subscriptions

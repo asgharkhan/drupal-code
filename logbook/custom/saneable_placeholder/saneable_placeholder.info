@@ -1,0 +1,6 @@
+
+name = Placeholder Js
+description = Add place holder to form input elements
+package = Saneable Custom
+core = 7.x
+version = 7.x

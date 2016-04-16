@@ -1,0 +1,16 @@
+<?php
+
+/**
+ * Implements drupal_init()
+ */
+
+function saneable_placeholder_init()
+{
+  global $theme;
+  //drupal_set_message("<pre>".print_r($theme, true)."</pre>");
+  if($theme == 'logbook') {
+    drupal_add_js(drupal_get_path('module', 'saneable_placeholder') . '/js/placeholder.js');
+  }
+    
+}
+/*funct

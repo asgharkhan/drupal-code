@@ -1,0 +1,23 @@
+<?php
+ function saneable_export_menu() {
+    $items['exportpdf/%/%'] = array(
+      'page callback' => 'saneable_export_report',
+      'page arguments' => array(1, 2),
+      'access callback' => TRUE,
+    );
+    return $items;
+  }
+
+  function saneable_export_report($from_date='', $to_date='') {
+    global $user;
+    $start_date = strtotime('2015-10-15 07:49');
+    $end_date = strtotime('2015-10-29 07:49');
+    $nids = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->condition('n.type', 'case')
+      ->condition('n.uid', $user->uid)
+      ->condition('created', array($start_date, $end_date), 'BETWEEN')
+      ->execute()
+      ->fetchCol(); // returns an indexed array
+
+  }

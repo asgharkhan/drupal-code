@@ -1,0 +1,127 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function saneable_repeat_case_init() {
+  //drupal_add_js('http://code.jquery.com/jquery-1.9.1.min.js', 'external');
+  drupal_add_js('//code.jquery.com/ui/1.11.4/jquery-ui.js', 'external');
+  drupal_add_css(drupal_get_path('module', 'saneable_repeat_case') . '/css/jquery.dialog.css', array('group' => CSS_DEFAULT, 'type' => 'file'));
+  drupal_add_js(drupal_get_path('module', 'saneable_repeat_case') . '/js/jquery.dialog.js');
+  drupal_add_js(drupal_get_path('module', 'saneable_repeat_case') . '/js/script.js');
+}
+
+
+
+function saneable_repeat_case_menu() {
+  //repeat node path
+  $items['repeat/case'] = array(
+    'page callback' => 'saneable_get_case_ajax',
+    'type' => MENU_CALLBACK,
+    'access arguments' => array('access content')
+  );
+  //delete node path
+  $items['delete/case/%'] = array(
+    'page callback' => 'saneable_delete_case_ajax',
+    'type' => MENU_CALLBACK,
+    'page arguments' => array(1,2),
+    'access arguments' => array('access content')
+  );
+  
+  //delete report
+  $items['delete/report/%'] = array(
+    'page callback' => 'saneable_delete_report_ajax',
+    'type' => MENU_CALLBACK,
+    'page arguments' => array(1,2),
+    'access arguments' => array('access content')
+  );
+  return $items;
+}
+
+/**
+ * Callback for Repeat case.
+ */
+function saneable_get_case_ajax() {
+  global $user;
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'node')
+      ->propertyCondition('type', 'case')
+      ->propertyCondition('uid', $user->uid)
+      ->propertyCondition('status', 1)
+      ->propertyOrderBy('created', 'DESC')
+      ->range(0, 1)
+      ->execute();
+  $node = '';
+  if (!empty($entities['node'])) {
+    $node = node_load(array_shift(array_keys($entities['node'])));
+  }
+  if (!empty($node)) {
+    $operation_tid = '';
+    $specialty= taxonomy_get_parents($node->field_speciality['und'][0]['tid']);
+    if(!empty($specialty)){
+    $specialtyId =  key($specialty);
+    $operation_tid= $node->field_speciality['und'][0]['tid'];
+    }
+    else{
+        $specialtyId = $node->field_speciality['und'][0]['tid'];
+    }
+    
+    //Get the specialty child by Specialty ID
+    $specialtyCilds = taxonomy_get_children($specialtyId, $vid = 0);
+    $specialtyCildArr = array();
+    foreach($specialtyCilds as $specialtyCild)
+    {
+      $specialtyCildArr[$specialtyCild->tid]=$specialtyCild->name;
+    }
+    
+    $data_arr = array('location' => $node->field_location['und'][0]['value'],
+      'supervision' => $node->field_supervision['und'][0]['tid'],
+      'priority' => $node->field_priority['und'][0]['tid'],
+      'asa' => $node->field_asa['und'][0]['tid'],
+      'specialty' => $specialtyId,
+      'procedure' => $node->field_procedure['und'][0]['tid'],
+      'anaes' => $node->field_anaesthetic['und'][0]['tid'],
+      'operation' => $operation_tid,
+      'specialtyChild'=>$specialtyCildArr
+    );
+    echo json_encode($data_arr);
+  }
+}
+
+/**
+ * Callback for Delete case.
+ */
+function saneable_delete_case_ajax($arg='', $arg2='') {
+  global $node;
+  $nid = $arg2;;
+  $node =  node_load($nid);
+  if(node_access('delete', $node))
+   {
+     node_delete($nid);
+    
+   }
+  echo json_encode($nid);
+}
+
+/**
+ * Callback for Delete Report.
+ */
+function saneable_delete_report_ajax($arg='', $arg2='') {
+  if(in_array("Subscribed User", $GLOBALS['user']->roles))
+  {
+    $itemid = $arg2;
+    if(entity_delete('field_collection_item', $itemid))
+    {
+      echo json_encode($nid);
+    }
+    else
+    {
+      echo 'some error';
+    }
+  }
+  else
+  {
+     $data = array('delete' => 'node deleted successfully!');
+     echo json_encode($data);
+  }
+}

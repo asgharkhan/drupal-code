@@ -1,0 +1,353 @@
+<?php
+function generate_report_pdf_menu() {
+  $items = array(); 
+  $items['generate-report'] = array(
+    'title' => '',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('fun_generate_report'),
+    'access callback' => TRUE,
+    );
+  $items['mypage'] = array(
+//'title' => 'PDF Generate Page',
+'page callback' => 'generate_report_pdf_page', //callback function for this page
+'access arguments' => array('access content'),
+'type' => MENU_CALLBACK,
+
+);
+  return $items;
+}
+
+/*function generate_report_pdf_theme_menu() {
+    $items['mypage'] = array(
+        'title' => 'Generate Report',
+        'page callback' => 'generate_report_pdf_page',
+        'access arguments' => array('access content'),
+        'type' => MENU_NORMAL_ITEM,
+        'file' => 'inc/mypage.pages.inc',
+    );
+ 
+    return $items;
+}*/
+
+function generate_report_pdf_theme() {
+    return array(
+        'generate_report_pdf_page' => array(
+            'template' => 'generate_report_pdf_page',
+            'arguments' => array('variable' => NULL),
+        ),
+    );
+}
+function generate_report_pdf_page(){
+//$name = 'Frank';
+ 
+//if($name != 'Neo'){
+$from_d = $_GET['from'];
+$to_d = $_GET['to'];
+$log_details = generate_pdf_arr($from_d,$to_d);;
+$variable = array('variable'=>$log_details);
+//drupal_set_message($_GET['from']);
+//drupal_set_message("<pre>".print_r($variable,true)."</pre>");
+//}
+// return 'ok';
+$html = theme('generate_report_pdf_page', $variable);
+echo $html;
+exit();
+//return theme('generate_report_pdf_page', $variable);	
+}
+/*function generate_report_pdf_preprocess_page(&$variables, $hook) {
+  //if ( my_condition() ) {
+    $variables['theme_hook_suggestions'][] = 'generate-report';
+  //}
+}*/
+function fun_generate_report_submit($form, &$form_state) {	
+	//drupal_set_message("<pre>".print_r($form_state,true)."</pre>");
+	//return;
+	if(isset($form_state['values']['generate_pdf_submit']) && $form_state['values']['generate_pdf_submit']=="Generate PDF"){
+		$from_d = $form_state['values']['date_from'];
+		$to_d = $form_state['values']['date_to'];
+		generate_pdf_arr($from_d,$to_d);
+	}
+}
+
+function generate_pdf_arr($from_d,$to_d){
+  global $user;
+		$result = db_query("SELECT `nid` FROM `node` where `type`='case' and `status`='1' and `nid` IN(SELECT `entity_id` FROM `field_data_field_date` 
+WHERE (field_date_value BETWEEN :from_d AND :to_d) and uid = :uid)", array(':from_d' => $from_d,':to_d' => $to_d, ':uid' => $user->uid));
+	// Result is returned as a iterable object that returns a stdClass object on each iteration
+	$report_pdf_arr = array();
+	$supervised_arr = array();
+	$sp_age_arr = array();
+	$sp_asa_arr = array();
+	$sp_time_arr = array();
+	$sp_priority_arr = array();
+	$case_pattern_arr = array();
+	$case_anaesthesia_arr = array();
+	$g_t_cases = 0;
+		foreach ($result as $record) {
+			$n = node_load($record->nid);
+			//drupal_set_message("<pre>".print_r($n->field_anaesthetic,true)."</pre>");
+			//anaesthesia cases log
+			if(isset($n->field_anaesthetic['und']))foreach($n->field_anaesthetic['und'] as $anth){
+				$anth_obj = taxonomy_term_load($anth['tid']);
+				if(!isset($case_anaesthesia_arr['total']))$case_anaesthesia_arr['total'] = 0;
+				$case_anaesthesia_arr['total']++;
+				if(!isset($case_anaesthesia_arr[$anth_obj->name]))$case_anaesthesia_arr[$anth_obj->name] = 0;
+				$case_anaesthesia_arr[$anth_obj->name]++;
+			}
+
+			if(isset($n->field_speciality['und']['0']['tid'])){
+				$parent = taxonomy_get_parents($n->field_speciality['und']['0']['tid']);
+				if($parent==""){
+					$speciality = taxonomy_term_load($parent);	  
+				}
+				else{
+					foreach($parent as $ii){
+						$speciality = $ii;
+					}
+				}
+				if(!isset($report_pdf_arr[$speciality->name]['t_cases']))$report_pdf_arr[$speciality->name]= array('t_cases'=>0);
+				$report_pdf_arr[$speciality->name]['t_cases'] += 1; 
+			$g_t_cases++;	
+			}
+			$supervision_name = "";
+			if(isset($n->field_supervision['und']['0']['tid'])){
+				$l_o_s = taxonomy_term_load($n->field_supervision['und']['0']['tid']);	  
+				//if(!isset($report_pdf_arr[$speciality->name]['l_o_s']))$report_pdf_arr[$speciality->name]['l_o_s']
+				if(!isset($report_pdf_arr[$speciality->name]['l_o_s'][$l_o_s->name]))$report_pdf_arr[$speciality->name]['l_o_s']= array($l_o_s->name=>0);
+				$report_pdf_arr[$speciality->name]['l_o_s'][$l_o_s->name] += 1; 
+				if(!isset($supervised_arr[$l_o_s->name]))$supervised_arr[$l_o_s->name] = 0;
+				$supervised_arr[$l_o_s->name]++;
+				$supervision_name = $l_o_s->name;//Name of Supervision
+				
+				//ASA Super vision Log
+				if(isset($n->field_asa['und']['0']['tid'])){
+					$asa = taxonomy_term_load($n->field_asa['und']['0']['tid']);
+					if(!isset($sp_asa_arr[$asa->name]['total']))$sp_asa_arr[$asa->name]['total'] = 0;
+					$sp_asa_arr[$asa->name]['total']++;
+					if(!isset($sp_asa_arr[$asa->name][$supervision_name]))$sp_asa_arr[$asa->name][$supervision_name] = 0;
+					$sp_asa_arr[$asa->name][$supervision_name]++;
+				}
+				//Time Super Vison Log 
+				if(isset($n->field_start['und']['0']['value'])){
+					$t = ($n->field_start['und']['0']['value']/60)/60;
+					$dayofweek = date('w', strtotime($n->field_date['und']['0']['value']));
+					if($dayofweek>=1 && $dayofweek<=5)$day_type = "Weekday";
+					if($dayofweek==0 || $dayofweek==6)$day_type = "Weekend";
+					if($t>=8 && $t<=18){
+						if(!isset($sp_time_arr['8_18']['total']))$sp_time_arr['8_18']['total']=0;
+						$sp_time_arr['8_18']['total']++;
+						if(!isset($sp_time_arr['8_18'][$supervision_name]))$sp_time_arr['8_18'][$supervision_name]=0;
+						$sp_time_arr['8_18'][$supervision_name]++;
+						
+						//Pattern Weekend, Weekday log
+						if(!isset($case_pattern_arr[$day_type]['Day']))$case_pattern_arr[$day_type]['Day']=0;
+						$case_pattern_arr[$day_type]['Day']++;						
+					}
+					if($t>18 && $t<=24){
+						if(!isset($sp_time_arr['18_24']['total']))$sp_time_arr['18_24']['total']=0;
+						$sp_time_arr['18_24']['total']++;
+						if(!isset($sp_time_arr['18_24'][$supervision_name]))$sp_time_arr['18_24'][$supervision_name]=0;
+						$sp_time_arr['18_24'][$supervision_name]++;
+						
+						//Pattern Weekend, Weekday log
+						if(!isset($case_pattern_arr[$day_type]['Evening']))$case_pattern_arr[$day_type]['Evening']=0;
+						$case_pattern_arr[$day_type]['Evening']++;						
+					}
+					if($t>=0 && $t<8){
+						if(!isset($sp_time_arr['0_8']['total']))$sp_time_arr['0_8']['total']=0;
+						$sp_time_arr['0_8']['total']++;
+						if(!isset($sp_time_arr['0_8'][$supervision_name]))$sp_time_arr['0_8'][$supervision_name]=0;
+						$sp_time_arr['0_8'][$supervision_name]++;
+						
+						//Pattern Weekend, Weekday log
+						if(!isset($case_pattern_arr[$day_type]['Night']))$case_pattern_arr[$day_type]['Night']=0;
+						$case_pattern_arr[$day_type]['Night']++;						
+					}
+				}				
+				//ASA Super vision Log
+				if(isset($n->field_priority['und']['0']['tid'])){
+					$prior = taxonomy_term_load($n->field_priority['und']['0']['tid']);
+					if(!isset($sp_priority_arr[$prior->name]['total']))$sp_priority_arr[$prior->name]['total'] = 0;
+					$sp_priority_arr[$prior->name]['total']++;
+					if(!isset($sp_priority_arr[$prior->name][$supervision_name]))$sp_priority_arr[$prior->name][$supervision_name] = 0;
+					$sp_priority_arr[$prior->name][$supervision_name]++;
+				}
+			}
+			
+			if(isset($n->field_age['und']['0']['value'])){
+				$age = $n->field_age['und']['0']['value'];
+				if($age<1){
+					if(!isset($report_pdf_arr[$speciality->name]['age']['_1']))$report_pdf_arr[$speciality->name]['age']= array('_1'=>0);
+					$report_pdf_arr[$speciality->name]['age']['_1'] += 1;
+
+					if(!isset($sp_age_arr['_1']['total']))$sp_age_arr['_1']['total'] = 0;
+					$sp_age_arr['_1']['total']++;
+					if(!isset($sp_age_arr['_1'][$supervision_name]))$sp_age_arr['_1'][$supervision_name] = 0;
+					$sp_age_arr['_1'][$supervision_name]++;
+					
+				}
+				else if($age>=1 && $age<=5){
+					if(!isset($report_pdf_arr[$speciality->name]['age']['1_5']))$report_pdf_arr[$speciality->name]['age']= array('1_5'=>0);
+					$report_pdf_arr[$speciality->name]['age']['1_5'] += 1;
+
+					if(!isset($sp_age_arr['1_5']['total']))$sp_age_arr['1_5']['total'] = 0;
+					$sp_age_arr['1_5']['total']++;
+					if(!isset($sp_age_arr['1_5'][$supervision_name]))$sp_age_arr['1_5'][$supervision_name] = 0;
+					$sp_age_arr['1_5'][$supervision_name]++;
+				}
+				else if($age>=6 && $age<=15){
+					if(!isset($report_pdf_arr[$speciality->name]['age']['6_15']))$report_pdf_arr[$speciality->name]['age']= array('6_15'=>0);
+					$report_pdf_arr[$speciality->name]['age']['6_15'] += 1;
+
+					if(!isset($sp_age_arr['6_15']['total']))$sp_age_arr['6_15']['total'] = 0;
+					$sp_age_arr['6_15']['total']++;
+					if(!isset($sp_age_arr['6_15'][$supervision_name]))$sp_age_arr['6_15'][$supervision_name] = 0;
+					$sp_age_arr['6_15'][$supervision_name]++;
+				}
+				else if($age>=16 && $age<=80){
+					if(!isset($report_pdf_arr[$speciality->name]['age']['16_80']))$report_pdf_arr[$speciality->name]['age']= array('16_80'=>0);
+					$report_pdf_arr[$speciality->name]['age']['16_80'] += 1;
+
+					if(!isset($sp_age_arr['16_80']['total']))$sp_age_arr['16_80']['total'] = 0;
+					$sp_age_arr['16_80']['total']++;
+					if(!isset($sp_age_arr['16_80'][$supervision_name]))$sp_age_arr['16_80'][$supervision_name] = 0;
+					$sp_age_arr['16_80'][$supervision_name]++;
+				}
+				else if($age>80){
+					if(!isset($report_pdf_arr[$speciality->name]['age']['80_']))$report_pdf_arr[$speciality->name]['age']= array('80_'=>0);
+					$report_pdf_arr[$speciality->name]['age']['80_'] += 1;
+
+					if(!isset($sp_age_arr['80_']['total']))$sp_age_arr['80_']['total'] = 0;
+					$sp_age_arr['80_']['total']++;
+					if(!isset($sp_age_arr['80_'][$supervision_name]))$sp_age_arr['80_'][$supervision_name] = 0;
+					$sp_age_arr['80_'][$supervision_name]++;
+				}
+			}
+		}
+	$arr = $report_pdf_arr;
+	foreach($arr as $spe => $key){
+		//drupal_set_message("<pre>".print_r($spe,true)."</pre>");
+		//drupal_set_message("<pre>".print_r($key,true)."</pre>");
+		$per = ($key['t_cases']/$g_t_cases)*100;
+		$report_pdf_arr[$spe]['percent']=$per."%";
+	}
+	$report_pdf_arr['total']=array('value'=>$g_t_cases);
+	$return_arr = array("case_anaesthesia_arr"=>$case_anaesthesia_arr,"case_pattern_arr"=>$case_pattern_arr,"supervised_arr"=>$supervised_arr,"sp_asa_arr"=>$sp_asa_arr,"sp_age_arr"=>$sp_age_arr,"sp_time_arr"=>$sp_time_arr,"sp_priority_arr"=>$sp_priority_arr,"report_pdf_arr"=>$report_pdf_arr);
+	return($return_arr);
+	/*drupal_set_message("<pre>".print_r($case_anaesthesia_arr,true)."</pre>");
+	drupal_set_message("<pre>".print_r($case_pattern_arr,true)."</pre>");
+	drupal_set_message("<pre>".print_r($supervised_arr,true)."</pre>");
+	drupal_set_message("<pre>".print_r($sp_asa_arr,true)."</pre>");
+	drupal_set_message("<pre>".print_r($sp_age_arr,true)."</pre>");	
+	drupal_set_message("<pre>".print_r($sp_time_arr,true)."</pre>");
+	drupal_set_message("<pre>".print_r($sp_priority_arr,true)."</pre>");		
+	drupal_set_message("<pre>".print_r($report_pdf_arr,true)."</pre>");	*/
+}
+function curl_get_contents($url)
+{
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+  $data = curl_exec($ch);
+  curl_close($ch);
+  return $data;
+}
+function fun_generate_report($form, &$form_state) {
+  /*$form['date_input'] = array(
+    '#title' => t("Input Date Range"),
+    
+    // The prefix/suffix provide the div that we're replacing, named by
+    // #ajax['wrapper'] above.
+    '#prefix' => '<div id="dates-div1">',
+    '#suffix' => '</div>',
+    '#type' => 'fieldset',
+  );
+$form['date_input']['date_from'] = array(
+    '#title' => t('From Date'),
+    '#type' => 'textfield',    
+  );
+
+$form['date_input']['date_to'] = array(
+    '#title' => t('To Date'),
+    '#type' => 'textfield',    
+  );
+	$form['date_input']['generate_pdf_submit'] = array(
+		'#value' => t('Generate PDF'),
+		'#type' => 'submit',    
+	  );
+	return $form;*/
+	define('_MPDF_PATH','mpdf60/');
+include("mpdf60/mpdf.php");
+
+//$html_url = 'mypage?from='.$_GET['from'].'&to='.$_GET['to'];
+//$html_url = 'index.php';
+//$html=curl_get_contents($html_url);
+ //$html =file_get_contents($html_url);
+//print "<pre>Data:".print_r($html_url,true)."</pre>";
+//$lurl=get_fcontent($html_url);
+//print "<pre>".print_r($lurl,true)."</pre>";
+$from_d = $_GET['from'];
+$to_d = $_GET['to'];
+$log_details = generate_pdf_arr($from_d,$to_d);;
+$variable = array('variable'=>$log_details);
+//drupal_set_message($_GET['from']);
+//drupal_set_message("<pre>".print_r($variable,true)."</pre>");
+//}
+// return 'ok';
+$html = theme('generate_report_pdf_page', $variable);
+//==============================================================
+//==============================================================
+//==============================================================
+
+$mpdf=new mPDF('c','A4','',''); 
+
+$mpdf->SetDisplayMode('fullpage');
+
+$mpdf->list_indent_first_level = 0;	// 1 or 0 - whether to indent the first level of a list
+
+// LOAD a stylesheet
+
+$mpdf->WriteHTML($html);
+$from_arr = explode('-',$from_d);
+$to_arr = explode('-',$to_d);
+$filename = "report-".$from_arr[2]."_".$from_arr[1]."_".$from_arr[0]."-".$to_arr[2]."_".$to_arr[1]."_".$to_arr[0].".pdf";
+$mpdf->Output($filename, 'D');
+exit;
+
+}
+
+/*function generate_report_pdf_form_alter(&$form, $form_state, $form_id) {
+    drupal_set_message($form_id);
+}
+function generate_report_pdf_case_node_form_form_submit($form, &$form_state) {
+	drupal_set_message("<pre>".print_r($form,true)."</pre>");
+	drupal_set_message("<pre>".print_r($form_state,true)."</pre>");
+}*/
+
+/*function generate_report_pdf_node_submit($node, $form, &$form_state) {
+	drupal_set_message("<pre>".print_r($form,true)."</pre>");
+	drupal_set_message("<pre>".print_r($form_state,true)."</pre>");
+	
+}*/
+function generate_report_pdf_init(){
+	$old_msg = drupal_get_messages();
+	//drupal_set_message("<pre>".print_r($old_msg,true)."</pre>");
+	if(isset($old_msg['status'])){
+		foreach($old_msg['status'] as $key => $msg){
+			//if(!is_array($msg)){
+				$string = strip_tags($msg);
+				$arr = explode( " " , $string );
+				$arr = array_unique( $arr );
+				$string = implode(" " , $arr);
+		//		$arr = explode( " " , $msg );
+	//drupal_set_message("<pre>".print_r($arr,true)."</pre>");
+				$old_msg['status'][$key] = $string;
+			//}
+		}
+	}
+	$_SESSION['messages'] = $old_msg;
+	//drupal_set_message("<pre>".print_r($old_msg,true)."</pre>");
+	
+}

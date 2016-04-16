@@ -1,0 +1,711 @@
+<?php
+
+define('FEED_BACK_NID', 71);
+
+// noteresource.module
+/**
+ * Implements hook_services_resources().
+ */
+
+function saneable_services_services_resources() {
+    return array(
+      'promo_code' => array(
+        'create' => array(
+          'help' => 'Check promo code',
+          'callback' => 'saneable_services_resource_callback',
+          'access arguments' => array('promo code service'),
+          'access arguments append' => FALSE,
+          'args' => array(
+            array(
+              'name' => 'data',
+              'type' => 'struct',
+              'description' => 'The note object',
+              'source' => 'data',
+              'optional' => FALSE,
+            ),
+          ),
+        ),
+      ),
+      'delete_reports' => array(
+        'create' => array(
+          'help' => 'Delete reports bulk opperation.',
+          'callback' => 'saneable_services_resource_delete_reports',
+          'access arguments' => array('web service reports delete'),
+          'access arguments append' => FALSE,
+          'args' => array(
+            array(
+              'name' => 'ids',
+              'type' => 'array',
+              'description' => 'Reports field collections ids for delete.',
+              'source' => 'data',
+              'optional' => FALSE,
+            ),
+          ),
+        ),
+      ),
+      'delete_cases' => array(
+        'create' => array(
+          'help' => 'Delete cases bulk opperation.',
+          'callback' => 'saneable_services_resource_delete_cases',
+          'access arguments' => array('web service cases delete'),
+          'access arguments append' => FALSE,
+          'args' => array(
+            array(
+              'name' => 'ids',
+              'type' => 'array',
+              'description' => 'Node nids for delete.',
+              'source' => 'data',
+              'optional' => FALSE,
+            ),
+          ),
+        ),
+      ),
+      'trial_plan' => array(
+        'create' => array(
+          'help' => 'Choose the trial plan',
+          'callback' => 'saneable_services_resource_choose_trial',
+          'access arguments' => array('web service choose trial'),
+          'access arguments append' => FALSE,
+          'args' => array(),
+        ),
+      ),
+      'subscription_plan' => array(
+        'create' => array(
+          'help' => 'Choose the subscription plan',
+          'callback' => 'saneable_services_resource_choose_subscription_plan',
+          'access arguments' => array('web service subscription plan'),
+          'access arguments append' => FALSE,
+          'args' => array(),
+        ),
+      ),
+      'current_plan' => array(
+        'index' => array(
+          'help' => 'Choose the subscription plan',
+          'callback' => 'saneable_services_resource_current_plan',
+          'access arguments' => array('web service current plan'),
+          'access arguments append' => FALSE,
+          'args' => array(),
+        ),
+      ),
+      'subscription_price' => array(
+        'index' => array(
+          'help' => 'Get the subscription price',
+          'callback' => 'saneable_services_resource_subscription_price',
+          'access arguments' => array('web service current plan'),
+          'access arguments append' => FALSE,
+          'args' => array(),
+        ),
+      ),
+//     'previous_case' => array(
+//      'index' => array(
+//        'help' => 'Get the previous case',
+//        'callback' => 'saneable_services_resource_previous_case',
+//        'access arguments' => array('web service previous case'),
+//        'access arguments append' => FALSE,
+//        'args' => array(),
+//      ),
+//    ),
+      'feedback' => array(
+        'create' => array(
+          'help' => 'Submit your feedback servicr',
+          'callback' => 'saneable_services_resource_feedback_callback',
+          'access arguments' => array('web service feedback'),
+          'access arguments append' => FALSE,
+          'args' => array(
+            array(
+              'name' => 'data',
+              'type' => 'struct',
+              'description' => 'The note object',
+              'source' => 'data',
+              'optional' => FALSE,
+            ),
+          ),
+        ),
+      ),
+      'getcase' => array(
+        'retrieve' => array(
+          'help' => 'Retrieve a case',
+          'callback' => 'saneable_services_resource_retrieve_callback',
+          'args' => array(
+            array(
+              'name' => 'nid',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'type' => 'int',
+              'description' => 'The nid of the node to retrieve',
+            ),
+          ),
+          'access callback' => '_node_resource_access',
+          'access arguments' => array('view'),
+          'access arguments append' => TRUE,
+        ),
+      ),
+      'previous-case' => array(
+        'index' => array(
+          'help' => 'Retrieve current user previous published case',
+          'callback' => 'saneable_services_get_previous_case',
+          'access arguments' => array('web service current plan'),
+          'access arguments append' => FALSE,
+          'args' => array(),
+      //    'access callback' => '_node_resource_access',
+       //   'access arguments' => array('view'),
+        ),
+      )
+    );
+}
+
+function saneable_services_permission() {
+    return array(
+      'promo code service' => array(
+        'title' => t('Promo Code Service'),
+        'description' => t('Communicate other devices to site e.g promo code.'),
+      ),
+      'web service reports delete' => array(
+        'title' => t('Web Service Reports Delete'),
+        'description' => t('Delete reports bulk opperation.'),
+      ),
+      'web service cases delete' => array(
+        'title' => t('Web Service Cases Delete'),
+        'description' => t('Delete cases bulk opperation.'),
+      ),
+      'web service choose trial' => array(
+        'title' => t('Web Service Choose Trial'),
+        'description' => t('Choose trial plan.'),
+      ),
+      'web service subscription plan' => array(
+        'title' => t('Web Service Subscription Plan'),
+        'description' => t('Choose subscription trial plan.'),
+      ),
+      'web service current plan' => array(
+        'title' => t('Web Service Current Plan'),
+        'description' => t('Check the user current plan.'),
+      ),
+      'web service subscription price' => array(
+        'title' => t('Web Service Subscription Price'),
+        'description' => t('Get the subscription price.'),
+      ),
+//    'web service previous case' => array(
+//      'title' => t('Web Service Previous Case'),
+//      'description' => t('Get the previous case data.'),
+//    ),
+      'web service feedback' => array(
+        'title' => t('Web Service feedback'),
+        'description' => t('Submit your feedback.'),
+      ),
+    );
+}
+
+function saneable_services_get_previous_case() {
+    global $user;
+$object=array();    
+    //$object = new stdClass();
+    $query = new EntityFieldQuery();
+    $entities = $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'case')
+        ->propertyCondition('uid', $user->uid)
+        ->propertyCondition('status', 1)
+        ->propertyOrderBy('created', 'DESC')
+        ->range(0, 1)
+        ->execute();
+    $node = '';
+    if (!empty($entities['node'])) {
+        $node = node_load(array_shift(array_keys($entities['node'])));
+    }
+    if (!empty($node)) {
+
+        $supervision = '';
+        $supervision_tid = '';
+        if (isset($node->field_supervision['und'])) {
+            $supervision_tid = $node->field_supervision['und'][0]['tid'];
+            $term_sup = taxonomy_term_load($supervision_tid);
+            $supervision = $term_sup->name;
+        }
+
+        $asa = '';
+        $asa_tid = '';
+        if (isset($node->field_asa['und'])) {
+            $asa_tid = $node->field_asa['und'][0]['tid'];
+            $term = taxonomy_term_load($asa_tid);
+            $asa = $term->name;
+        }
+        $priority = '';
+        $priority_tid = '';
+        if (isset($node->field_priority['und'])) {
+            $priority_tid = $node->field_priority['und'][0]['tid'];
+            $term_priority = taxonomy_term_load($priority_tid);
+            $priority = $term_priority->name;
+        }
+        $speciality = '';
+        $speciality_tid = '';
+        $operation_tid = '';
+        $operation = '';
+        $operations = array();
+        if (isset($node->field_speciality['und'])) {
+            $speciality_tid = $node->field_speciality['und'][0]['tid'];
+            $specialty = taxonomy_get_parents($node->field_speciality['und'][0]['tid']);
+            if (!empty($specialty)) {//having parent(its mean sepeciality and operation bot are selected)
+                $operation_tid = $speciality_tid;
+                $term_ope = taxonomy_term_load($speciality_tid);
+                $operation = $term_ope->name;
+
+                $specialtyId = key($specialty);
+
+                $specialtyCilds = taxonomy_get_children($specialtyId, $vid = 0);
+                foreach ($specialtyCilds as $specialtyCild) {
+                    $operations[]['tid'] = $specialtyCild->tid;
+                }
+
+
+                $speciality_tid = $specialty[$specialtyId]->tid;
+                $speciality = $specialty[$specialtyId]->name;
+            }
+            else {
+                $term_spec = taxonomy_term_load($speciality_tid);
+                $speciality = $term_spec->name;
+            }
+        }
+
+        $procedure = array(); //multi
+        $procedure_tid = array();
+        if (isset($node->field_procedure['und'])) {
+            foreach ($node->field_procedure['und'] as $key => $val) {
+                $procedure_tid[]['tid'] = $val['tid'];
+                $term_pro = taxonomy_term_load($val['tid']);
+                $procedure[] = $term_pro->name;
+            }
+        }
+
+        $anaesthetic = array(); //multi
+        $anaesthetic_tid = array();
+        if (isset($node->field_anaesthetic['und'])) {
+            foreach ($node->field_anaesthetic['und'] as $key => $val) {
+                $anaesthetic_tid[]['tid'] = $val['tid'];
+                $term_ana = taxonomy_term_load($val['tid']);
+                $anaesthetic[] = $term_ana->name;
+            }
+        }
+
+        $object['location'] = (isset($node->field_location['und'])) ? $node->field_location['und'][0]['value'] : '';
+        $object['supervision']= $supervision;
+        $object['supervision_tid']= $supervision_tid;
+        $object['asa']= $asa;
+        $object['priority']= $priority;
+        $object['speciality']= $speciality;
+        $object['procedure']= $procedure;
+        $object['anaesthetic']= $anaesthetic;
+
+
+        $object['asa_tid']= $asa_tid;
+        $object['priority_tid']= $priority_tid;
+        $object['speciality_tid']= $speciality_tid;
+        $object['operation_tid']= $operation_tid;
+        $object['operation']= $operation;
+        $object['case_nid']= $node->nid;
+        $object['anaesthetic_tid']= $anaesthetic_tid;
+        $object['procedure_tid']= $procedure_tid;        
+    }  
+    //echo json_encode($object);
+    return $object;
+}
+
+function saneable_services_resource_retrieve_callback($nid) {
+    $node = node_load($nid);
+    $response = array();
+    if ($node) {
+        $uri = entity_uri('node', $node);
+        $node->path = url($uri['path'], array('absolute' => TRUE));
+        // Unset uri as it has complete entity and this
+        // cause never ending recursion in rendering.
+        unset($node->uri);
+    }
+    //Lets check field_permissions
+    $node = services_field_permissions_clean('view', 'node', $node);
+    $response['nid'] = $node->nid;
+    $response['reference'] = $node->title;
+    $fields = array(
+      'field_age',
+      'field_sex',
+      'field_date',
+      'field_start',
+      'field_end',
+      'field_location',
+      'field_supervision',
+      'field_asa',
+      'field_priority',
+      //  'field_anaesthetic',
+      //  'field_procedure',
+      'body'
+    );
+    //$case_fields = field_info_instances('node', 'case');
+    foreach ($fields as $field_name) {
+        $field_value = field_get_items('node', $node, $field_name);
+        if ($field_value) {
+            $value = array_shift($field_value[0]);
+            if (in_array($field_name, array('field_start', 'field_end'))) {
+                $response[$field_name] = _hms_seconds_to_formatted($value);
+            }
+//      elseif (in_array($field_name, array('field_dob', 'field_date'))) {
+//        $response[$field_name] = format_date(strtotime($value), 'custom', 'd/m/Y');
+//      }
+            else {
+                $response[$field_name] = $value;
+            }
+        }
+        else {
+            $response[$field_name] = NULL;
+        }
+    }
+
+    // Depenedend fields like speciality.
+    $spec_fields = field_get_items('node', $node, 'field_speciality');
+    if ($spec_fields) {
+        $op_tid = array_shift($spec_fields[0]);
+        $response['field_operation'] = $op_tid;
+        $spec_tid = taxonomy_get_parents($op_tid);
+        if ($spec_tid) {
+            $response['field_speciality'] = key($spec_tid);
+        }
+        else {
+            $response['field_speciality'] = $op_tid;
+            $response['field_operation'] = NULL;
+        }
+        // watchdog('field_speciality', "<pre>".print_r($response, true)."</pre>");
+    }
+    else {
+        $response['field_speciality'] = NULL;
+        $response['field_operation'] = NULL;
+    }
+
+    // For multi fields
+    $m_fields = array('field_anaesthetic', 'field_procedure');
+    foreach ($m_fields as $mfield_name) {
+        $mfield_value = field_get_items('node', $node, $mfield_name);
+        if ($mfield_value) {
+            foreach ($mfield_value as $mvalue) {
+                $response[$mfield_name][] = $mvalue['tid'];
+            }
+        }
+        else {
+            $response[$mfield_name] = NULL;
+        }
+    }
+    // For multi dependent fields.
+    $incident_field = field_get_items('node', $node, 'field_incident_type');
+    if ($incident_field) {
+        foreach ($incident_field as $k => $incident_values) {
+            $inc_tid = $incident_values['tid'];
+            $response['field_incident_type'][] = $inc_tid;
+            $inc_type = taxonomy_get_parents($inc_tid);
+            if ($inc_type) {
+                $inc_type_tid = key($inc_type);
+                $response['field_incident_type_parent'] = $inc_type_tid;
+                $response['incident_type'][$inc_type_tid] = $inc_tid;
+                $response['incident'][$k]['parent'] = $inc_type_tid;
+                $response['incident'][$k]['child'] = $inc_tid;
+            }
+            else {
+                $response['incident_type'][$inc_type_tid] = $inc_tid;
+                $response['incident'][$k]['parent'] = $inc_tid;
+                $response['incident'][$k]['child'] = NULL;
+            }
+        }
+    }
+    else {
+        $response['field_incident_type_parent'] = NULL;
+        $response['incident'][0]['parent'] = NULL;
+        $response['incident'][0]['child'] = NULL;
+    }
+    // watchdog('retreive_node', "<pre>" . print_r($node, true) . "</pre>");
+    // watchdog('retreive_node_response', "<pre>" . print_r($response, true) . "</pre>");
+    return $response;
+}
+
+function saneable_services_resource_feedback_callback($data) {
+    global $user;
+    if ($user->uid == 0) {
+        return array('status' => 'fail', 'error_code' => -1, 'message' => t('Please login'));
+    }
+    if (!isset($data['name'])) {
+        return array('status' => 'fail', 'error_code' => -2, 'message' => t('Feedback name is missing.'));
+    }
+    if (!isset($data['email'])) {
+        return array('status' => 'fail', 'error_code' => -3, 'message' => t('Feedback email is missing.'));
+    }
+    if (!isset($data['message'])) {
+        return array('status' => 'fail', 'error_code' => -4, 'message' => t('Feedback meessage is missing.'));
+    }
+    $node = node_load(FEED_BACK_NID);
+    $values = array(
+      1 => array($data['name']),
+      2 => array($data['email']),
+      3 => array($data['message']),
+    );
+    watchdog('web_service_feedback', '<pre>' . print_r($data, true) . "</pre>");
+    $submission = (object) array(
+          'nid' => FEED_BACK_NID,
+          'uid' => $user->uid,
+          'submitted' => REQUEST_TIME,
+          'remote_addr' => ip_address(),
+          'is_draft' => FALSE,
+          'data' => $values,
+    );
+    module_load_include('inc', 'webform', 'includes/webform.submissions');
+    webform_submission_insert($node, $submission);
+    webform_submission_send_mail($node, $submission);
+    return array('status' => 'pass', 'error_code' => 0, 'message' => t('Feedback submitted successfully.'));    
+}
+
+function saneable_services_resource_callback($data) {
+    if (!isset($data['promo_code'])) {
+        return array(
+          'error_code' => '-6',
+          'message' => 'Please promo_code argument.',
+          'status' => 'Fail',
+        );
+    }
+    $promo_code = $data['promo_code'];
+    watchdog('promo_code', "<pre>" . print_r($data, true) . "</pre>");
+    $response = saneable_subscriptions_check_promo_code($promo_code);
+    return $response;
+}
+
+function saneable_services_resource_delete_reports($data) {
+
+    if (!isset($data['ids']) || !is_array($data['ids'])) {
+        return array('status' => 'fail', 'error_code' => -1);
+    }
+    $ids = $data['ids'];
+    $new_ids = array();
+//  return $ids;
+    foreach ($ids as $id) {
+        if (field_collection_item_load($id)) {
+            $new_ids[] = $id;
+        }
+    }
+//  return $new_ids;
+    watchdog('delete_reports', "<pre>" . print_r($new_ids, true) . "</pre>");
+    if (count($new_ids)) {
+        foreach ($new_ids as $nid) {
+            entity_delete('field_collection_item', $nid);
+        }
+        return array('status' => 'pass', 'error_code' => 0);
+    }
+    return array('status' => 'fail', 'error_code' => -2);
+}
+
+function saneable_services_resource_delete_cases($data) {
+    if (!isset($data['ids']) || !is_array($data['ids'])) {
+        return array('status' => 'fail', 'error_code' => -1);
+    }
+    $ids = $data['ids'];
+    $new_ids = array();
+//  return $ids;
+    foreach ($ids as $id) {
+        if ($node = node_load($id)) {
+            if (node_access('delete', $node)) {
+                $new_ids[] = $id;
+            }
+        }
+    }
+//  return $new_ids;
+    watchdog('delete_cases', "<pre>" . print_r($new_ids, true) . "</pre>");
+    if (count($new_ids)) {
+        foreach ($new_ids as $nid) {
+            node_delete($nid);
+        }
+        return array('status' => 'pass', 'error_code' => 0);
+    }
+    return array('status' => 'fail', 'error_code' => -2);
+}
+
+function saneable_services_resource_choose_trial() {
+    global $user;
+    if ($user->uid == 0) {
+        return array('status' => 'fail', 'error_code' => -1);
+    }
+    $roles = array(
+      4 => t('Trial User'),
+      5 => t('Subscribed User'),
+      6 => t('Trial Expired User'),
+      7 => t('Subscribed Expired User')
+    );
+    $ar_diff = array_diff_key($roles, $user->roles);
+    //return $ar_diff;
+    if (!array_intersect_key($roles, $user->roles)) {
+        $user->roles[4] = t('Trial User');
+        user_save($user);
+        return array('status' => 'pass', 'error_code' => 0);
+    }
+
+    return array('status' => 'fail', 'error_code' => -2);
+}
+
+function saneable_services_resource_choose_subscription_plan() {
+    global $user;
+    if ($user->uid == 0) {
+        return array('status' => 'fail', 'error_code' => -1);
+    }
+    $order = saneable_subscriptions_create_order();
+    if (!$order) {
+        return array('status' => 'fail', 'error_code' => -2);
+    }
+    // Active the licnse 
+    commerce_license_activate_order_licenses($order);
+    commerce_order_save($order);
+    $from = format_date(time(), 'case_date');
+    $to = format_date(strtotime('+1 years'), 'case_date');
+    return array('status' => 'pass', 'error_code' => 0, 'from' => $from, 'to' => $to);
+}
+
+function saneable_services_resource_current_plan() {
+    //$trial = user_has_role(4);
+    //$subscribe = user_has_role(5);
+    //$expired = user_has_role(6);
+    global $user;
+    if ($user->uid == 0) {
+        return array('status' => 'fail', 'error_code' => -1);
+    }
+    $response = array(
+      4 => array('status' => 'pass', 'error_code' => 0, 'type' => 'Trial', 'rid' => 4, 'callback' => 'saneable_services_remaining_cases'),
+      5 => array('status' => 'pass', 'error_code' => 0, 'type' => 'Subscribed', 'rid' => 5, 'callback' => 'saneable_services_remaining_days'),
+      6 => array('status' => 'pass', 'error_code' => 0, 'type' => 'Trial Expired', 'rid' => 6),
+      7 => array('status' => 'pass', 'error_code' => 0, 'type' => 'Subscription Expired', 'rid' => 7),
+    );
+    $current_plan = array_intersect_key($response, $user->roles);
+    if ($current_plan) {
+        $response = array_shift($current_plan);
+        if (isset($response['callback'])) {
+            $response['remaining'] = $response['callback']();
+            unset($response['callback']);
+        }
+        return $response;
+    }
+    else {
+        return array('status' => 'fail', 'error_code' => -2, 'type' => 'No plan', 'rid' => '0');
+    }
+}
+
+function saneable_services_remaining_cases() {
+    $cases = saneable_remaining_cases();
+    return $cases['remaining_cases'];
+}
+
+function saneable_services_remaining_days() {
+    return saneable_custom_get_subscription_remaining_days();
+}
+
+function saneable_services_resource_subscription_price() {
+    $product = commerce_product_load(SANEABLE_PRODUCT_ID);
+    $price = commerce_product_calculate_sell_price($product);
+    $price_display = commerce_currency_format($price['amount'], $price['currency_code'], $product);
+    $currency = commerce_currency_load($price['currency_code']);
+    $amount = commerce_currency_amount_to_decimal($price['amount'], $price['currency_code']);
+    $simple_price = number_format(commerce_currency_round(abs($amount), $currency), 0, $currency['decimal_separator'], $currency['thousands_separator']);
+
+    watchdog('ws_check_price', "<pre>" . print_r($currency, true) . "</pre>");
+    return array(
+      'status' => 'pass',
+      'error_code' => 0,
+      'display_price' => '₤ ' . $simple_price,
+      'price' => $simple_price,
+      'currency_code' => $price['currency_code'],
+    );
+}
+
+function saneable_services_services_request_preprocess_alter($controller, &$args, $options) {
+    global $user;
+    // watchdog('json_generate_reports', json_encode($args));
+    // watchdog('post_generate_reports', "<pre>".print_r($args, true)."</pre>");
+    if ($controller['callback'] == '_node_resource_create' && isset($args[0]['type']) && $args[0]['type'] == 'generate_reports') {
+        //  watchdog('json_generate_reports', json_encode($args));
+        // watchdog('post_generate_reports', "<pre>".print_r($args, true)."</pre>");
+        $post = Array(
+          0 => Array
+            (
+            'field_reports_date' => Array
+              (
+              'und' => Array
+                (
+                0 => Array
+                  (
+                  'field_from_date' => Array
+                    (
+                    'und' => Array
+                      (
+                      0 => Array
+                        (
+                        'value' => Array
+                          (
+                          'date' => $args[0]['generate_from']
+                        )
+                      )
+                    )
+                  ),
+                  'field_end_date' => Array
+                    (
+                    'und' => Array
+                      (
+                      '0' => Array
+                        (
+                        'value' => Array
+                          (
+                          'date' => $args[0]['generate_to']
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            ),
+            'type' => 'generate_reports'
+          )
+        );
+        $args = $post;
+    }
+
+    if ($controller['callback'] == '_node_resource_create' && isset($args[0]['type']) && $args[0]['type'] == 'case') {
+        if ($user->uid == 0) {
+            print drupal_json_encode(array('status' => 'fail', 'error_code' => -1));
+            exit();
+        }
+
+
+
+        $trial_expired = user_has_role(6);
+        $subscribed_expired = user_has_role(7);
+        $trial = user_has_role(4);
+        $subscribe = user_has_role(5);
+        if ($trial_expired || $subscribed_expired) {
+            print drupal_json_encode(array('status' => 'fail', 'error_code' => -2, 'message' => t("Your role bas been expired.")));
+            exit();
+        }
+
+        // For Trial.
+        if ($trial) {
+            $cases = saneable_remaining_cases();
+            if ($cases['remaining_cases'] <= 0) {
+                print drupal_json_encode(array('status' => 'fail', 'error_code' => -3, 'message' => t('You could not submit more cases.')));
+                exit();
+            }
+        }
+        // For subscribed users.
+        if ($subscribe) {
+            $days = saneable_custom_get_subscription_remaining_days();
+            if ($days <= 0) {
+                print drupal_json_encode(array('status' => 'fail', 'error_code' => -4, 'message' => t('Subscription days end')));
+                exit();
+            }
+        }
+    }
+}
+
+//function saneable_services_services_views_execute_view_alter(&$output, $view) {
+//  if ($view->name == 'cases' && $view->current_display == 'services_1') {
+//    $unpublish_views = views_embed_view('cases', 'services_4');
+//    $paged_output = array(
+//      'publish' => $output,
+//      'unpublish' => $view->total_rows,
+//    );
+//    $output = $paged_output;
+//  }
+//}

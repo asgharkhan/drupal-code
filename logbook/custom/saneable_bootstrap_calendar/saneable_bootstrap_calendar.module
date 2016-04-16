@@ -1,0 +1,20 @@
+<?php
+function saneable_bootstrap_calendar_form_alter(&$form, &$form_state, $form_id) {
+if($form_id == "generate_reports_node_form" || $form_id == "case_node_form" || $form_id == "field_collection_item_form"){
+        $form['#attached']['css'] = array(
+         
+        drupal_get_path('module', 'saneable_bootstrap_calendar') . '/datepicker/css/datepicker.css',
+        drupal_get_path('module', 'saneable_bootstrap_calendar') . '/datepicker/css/saneable_bootstrap_calendar.css',
+      );
+      $form['#attached']['js'] = array(
+        
+        drupal_get_path('module', 'saneable_bootstrap_calendar') . '/datepicker/js/bootstrap-datepicker.js',
+        drupal_get_path('module', 'saneable_bootstrap_calendar') . '/js/script.js',
+      );  
+      
+      
+        
+    }
+ 
+}
+

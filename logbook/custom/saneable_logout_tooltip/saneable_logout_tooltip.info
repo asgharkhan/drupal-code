@@ -1,0 +1,4 @@
+name= Saneable Logout Tooltip
+description= Create a tooltip for user logout and setting page.
+core = 7.x
+

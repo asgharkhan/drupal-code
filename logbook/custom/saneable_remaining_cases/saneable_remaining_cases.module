@@ -1,0 +1,69 @@
+<?php
+
+/**
+  name = "number_remaing_cases"
+  description = "Number of Remaining Cases"
+  package = "custom"
+  core = "7.x"
+  version = "7.x-1.0"
+ */
+function saneable_remaining_cases_block_info() {
+  $blocks['number_remaing_cases'] = array(
+    'info' => t('Number of Remaining Cases')
+  );
+
+  return $blocks;
+}
+
+function saneable_remaining_cases_block_view() {
+  $blcok['content'] = cases_created_by_user();
+  return $blcok;
+}
+
+function cases_created_by_user() {
+  global $user;
+  $block['subject'] = t('');
+   $cases = saneable_remaining_cases();
+    return theme('remaining_case', array(
+      'var1' => $cases['created_cases'],
+      'var2' => $cases['remaining_cases'],
+    ));
+  
+}
+
+function saneable_remaining_cases_theme() {
+  $module_path = drupal_get_path('module', 'saneable_remaining_cases');
+  return array(
+    'remaining_case' => array(
+      'template' => 'remaining-cases', // remaining-cases.tpl.php
+      'path' => $module_path . '/templates',
+      'variables' => array('var1' => null, 'var2' => null)
+    )
+  );
+}
+
+function saneable_remaining_cases() {
+  global $user;
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'node')
+      ->propertyCondition('type', 'case')
+      ->propertyCondition('uid', $user->uid)
+    //  ->propertyCondition('status', 1)
+      ->execute();
+  $total_allow_cases = 3;
+  $numberof_created_cases = 0;
+  $remaining_cases = 3;
+  if (!empty($entities['node'])) {
+    $numberof_created_cases = count($entities['node']);
+    $remaining_cases = $total_allow_cases - $numberof_created_cases;
+    if($remaining_cases<=0)
+    {
+      $remaining_cases =0;
+    }
+  }
+  
+  return array(
+    'created_cases' => $numberof_created_cases,
+    'remaining_cases' => $remaining_cases,
+  );
+}

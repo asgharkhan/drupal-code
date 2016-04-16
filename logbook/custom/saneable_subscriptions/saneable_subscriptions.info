@@ -1,0 +1,5 @@
+name = Saneable Subscription
+description = Create Subscriptions plan for users.
+core = 7.x
+
+dependencies[] = "commerce"

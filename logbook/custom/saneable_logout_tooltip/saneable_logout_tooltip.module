@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * Create a tooltip popup box.
+ */
+function saneable_logout_tooltip_init() {
+  global $theme;
+  if ($theme == 'logbook') {
+    $popup_box = theme('saneable_logout_tooltip_popup');
+    drupal_add_js(array('saneable_logout_tooltip' => array('popup_box' => $popup_box)), 'setting');
+
+    drupal_add_js(drupal_get_path('module', 'saneable_logout_tooltip') . '/js/tooltip.js');
+        drupal_add_css(drupal_get_path('module', 'saneable_logout_tooltip') . '/css/tooltip.css');
+
+  }
+}
+
+function saneable_logout_tooltip_theme() {
+  return array(
+    'saneable_logout_tooltip_popup' => array(
+      'template' => 'saneable-logout-tooltip-popup'
+    )
+  );
+}

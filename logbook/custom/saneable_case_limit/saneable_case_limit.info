@@ -1,0 +1,3 @@
+name = Limit node entry
+description = Limit Case Node entries upto three
+core = 7.x

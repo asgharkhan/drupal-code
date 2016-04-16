@@ -1,0 +1,12 @@
+            .font0 {
+                font-size: 10px;
+            }
+            table, td, tr
+            {
+                border: .5px solid #AFB1B3;
+            }
+            td{
+                padding: 2px 5px;
+                   border-right: 0 none;
+            }
+            table{width: 680px;}

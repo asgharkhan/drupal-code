@@ -1,0 +1,126 @@
+<?php
+function responsive_block_slider_init() {
+	//Check for hiding date values on case add page
+	//drupal_add_js("$(window).ready(function(){var targetID = 'edit-field-age-und-0-value';$(targetID).val('test');});", 'inline');
+	
+	//Applying styling for toggle active state for different fields on pages..
+	drupal_add_js('jQuery(document).ready(function () { jQuery("#arsmain li a").click(function(){jQuery(this).toggleClass("active");}); });', 'inline');
+	drupal_add_js('jQuery(document).ready(function () { jQuery("#auth_box button").click(function(){jQuery(this).toggleClass("active");}); });', 'inline');
+	drupal_add_js('jQuery(document).ready(function () { jQuery(".not-logged-in #bottom_part a").click(function(){jQuery(this).toggleClass("active");}); });', 'inline');
+	
+	//Making Email and user name fields disabled on feedback page
+	drupal_add_js('jQuery(document).ready(function () { jQuery(".section-feedback #edit-submitted-email").attr("disabled", "disabled"); });', 'inline');
+	drupal_add_js('jQuery(document).ready(function () { jQuery(".section-feedback #edit-submitted-name").attr("disabled", "disabled"); });', 'inline');
+
+	//drupal_add_js('jQuery(document).ready(function () { jQuery(".page-cases .large-12").hover(function(){jQuery(this).css("opacity", "0.80");}); });', 'inline');
+	//drupal_add_js('jQuery(document).ready(function () { jQuery(".page-cases .large-12").mouseout(function(){jQuery(this).css("opacity", "1.0");}); });', 'inline');
+
+	//drupal_add_js('jQuery(document).ready(function () { jQuery(".page-node-add-generate-reports .datepicker").css({ top: "0px" }); });', 'inline');
+	//drupal_access_denied();
+	//global $base_url;
+	
+	//Access Denied Page Redirect for Anonymous Users
+	global $user;
+	$allowed_anonymous = array("/","/user/password","/user/register","/user/login");
+	$lnk = request_uri();
+	//drupal_set_message($lnk);
+	//print("<pre>".print_r(arg(),true)."</pre>");
+	if (in_array("anonymous user", $user->roles) && arg(0) != 'rest-api' ){
+		if(!in_array($lnk, $allowed_anonymous)){
+			drupal_goto("user/login");
+		}
+	}
+	//$lnk = request_uri();
+	//drupal_set_message($lnk);
+	//drupal_set_message("<pre>".print_r($lnk,true)."</pre>");
+}
+function responsive_block_slider_form_alter(&$form, &$form_state, $form_id) {
+	//Applying Empty date Check on node/add/generate-reports
+	if($form_id == 'generate_reports_node_form') {
+    $form['#validate'][] = 'checkout_confirm_ars_date_validate';
+  }
+}
+function checkout_confirm_ars_date_validate($form, &$form_state) {
+	//Applying Empty date Check on node/add/generate-reports
+  if($form_state["values"]["field_reports_date"]["und"]["0"]["field_from_date"]["und"]["0"]["value"]=="" && $form_state["values"]["field_reports_date"]["und"]["0"]["field_end_date"]["und"]["0"]["value"]==""){
+	form_set_error("Error!","Please Enter From & To Date");
+	}
+  if($form_state["values"]["field_reports_date"]["und"]["0"]["field_from_date"]["und"]["0"]["value"]==""){
+	form_set_error("Error!","Please Enter From Date");
+	}
+  if($form_state["values"]["field_reports_date"]["und"]["0"]["field_end_date"]["und"]["0"]["value"]==""){
+	form_set_error("Error!","Please Enter To Date");
+	}
+}
+function responsive_block_slider_menu() {
+	
+  $items = array(); 
+/*  $items['choose-resplan'] = array(
+    'title' => '',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('fun_resp_plan'),
+    'access callback' => TRUE,
+    );*/
+    
+  $items['choose-plan'] = array(
+'title' => '',
+'page callback' => 'fun_resp_plan', //callback function for this page
+'access arguments' => array('access content'),
+'type' => MENU_CALLBACK,
+
+);
+  return $items;
+}
+
+function responsive_block_slider_theme() {
+    return array(
+        'fun_resp_plan' => array(
+            'template' => 'fun_resp_plan',
+            'arguments' => array('variable' => NULL),
+        ),
+    );
+}
+function responsive_block_slider_js_alter(&$javascript){
+	//drupal_set_message("<pre>".print_r($javascript,true)."</pre>");
+	/*$path=drupal_get_path_alias();
+	if($path == 'choose-plan'){
+		unset($javascript['sites/all/modules/contrib/jquery_update/replace/jquery/1.7/jquery.min.js']);
+		 //drupal_add_js('sites/all/modules/contrib/jquery_update/replace/jquery/2.1/jquery.min.js', 'file');
+		 drupal_set_message("<pre>".print_r($javascript,true)."</pre>");
+	}*/
+}
+function fun_resp_plan(){
+//$name = 'Frank';
+ 
+//if($name != 'Neo'){
+/*$from_d = $_GET['from'];
+$to_d = $_GET['to'];
+$log_details = generate_pdf_arr($from_d,$to_d);;*/
+						//$block = module_invoke('bean', 'block_view', '3-case-trial');
+//						print render ($block);
+//drupal_set_message("<pre>".print_r($block,true)."</pre>");
+/*global $user;
+
+$u = user_load($user->uid);
+drupal_set_message("<pre>".print_r($u,true)."</pre>");*/
+
+		//$block1 = module_invoke('bean', 'block_view', 'three-case-trial');
+		//$block1_var = render($block1['content']);
+
+		//$block2 = module_invoke('bean', 'block_view', 'subscription');
+		//$block2_var = render($block2['content']);
+
+		//$block3 = module_invoke('bean', 'block_view', 'promo-code');
+		//$block3_var = render($block3['content']);
+
+		//$append_data = '<div class="flexslider"><ul class="slides" id="arsmain"><li>'.$block1_var.'</li><li>'.$block2_var.'</li><li>'.$block3_var.'</li></ul></div>';
+		//$j_q_var="jQuery( window ).resize(function() {if(jQuery( window ).width()<=640){jQuery('.flexslider').flexslider({startAt: 0,slideshow: false,controlsContainer: '.flexslider'});}else{$('.flexslider').remove();$('.flex-container').append('".$append_data."');}});";
+drupal_add_js('sites/all/themes/logbook/js/flex_slider/jquery.flexslider-min.js', 'file');
+drupal_add_js('sites/all/themes/logbook/js/flex_slider/slider_load.js', 'file');
+$variable = array('variable'=>'');
+//drupal_set_message($_GET['from']);
+//drupal_set_message("<pre>".print_r($append_data,true)."</pre>");
+//}
+// return 'ok';
+return theme('fun_resp_plan', $variable);	
+}

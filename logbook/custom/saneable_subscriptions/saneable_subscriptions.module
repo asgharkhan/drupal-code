@@ -1,0 +1,194 @@
+<?php
+define('SANEABLE_PRODUCT_ID', 1);
+/**
+ * Implements hook_field_formatter_info().
+ */
+function saneable_subscriptions_field_formatter_info() {
+  return array(
+    'commerce_license_duration_date' => array(//Machine name of the formatter
+      'label' => t('Commerce License Duration Date'),
+      'field types' => array('number_integer'), //This will only be available to text fields
+    ),
+  );
+}
+
+function saneable_subscriptions_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  if ($display['type'] == 'commerce_license_duration_date') {
+    $units = commerce_license_duration_units();
+    // dsm($items);
+    // drupal_set_message("<pre>".print_r($items, true)."</pre>");
+    foreach ($items as $delta => $item) {
+      if ($item['value'] > 0) {
+        // list($value, $unit) = commerce_license_duration_from_timestamp($item['value']);
+        $from = format_date(time(), 'custom', 'd/m/Y');
+        $to = format_date(time() + $item['value'], 'custom', 'd/m/Y');
+        $element[$delta] = array(
+          '#theme' => 'saneable_subscriptions_date',
+          '#from' => $from,
+          '#to' => $to,
+        );
+      }
+      else {
+        $element = array(
+          '#markup' => t('Unlimited'),
+        );
+      }
+    }
+  }
+
+  return $element;
+}
+
+function saneable_subscriptions_theme() {
+  return array(
+    'saneable_subscriptions_date' => array(
+      'variables' => array('from' => Null, 'to' => Null),
+    )
+  );
+}
+
+function theme_saneable_subscriptions_date($vars) {
+  //dsm($vars);
+  $from = $vars['from'];
+  $to = $vars['to'];
+
+  $output = "<div class='saneable-subscription-container saneable-subscription-from-container'>";
+  $output .= "<div class='field-label'>Start Date:</div>";
+  $output .= "<div class='saneable-subscription-date saneable-subscription-from-date'> " . $from . "</div>";
+  $output .="</div>";
+  $output .= "<div class='saneable-subscription-container saneable-subscription-to-container'>";
+  $output .= "<div class='field-label'>End Date:</div>";
+  $output .= "<div class='saneable-subscription-date saneable-subscription-from-date'> " . $to . "</div>";
+  $output .="</div>";
+
+// "<div class='saneable-subscription-date saneable-subscription-from-date>' ".format_date(time(), 'custom', 'd/m/Y')."</div>";
+
+  return $output;
+}
+
+function saneable_subscriptions_menu() {
+  $items = array();
+  $items['promo-code'] = array(
+    //  'title' => t(''),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('saneable_subscriptions_promo_code_form'),
+    'access arguments' => array('choose plan'),
+  );
+
+  return $items;
+}
+
+function saneable_subscriptions_promo_code_form() {
+  // $order_id = commerce_cart_order_id();
+  $form = array();
+  $form['promo_code'] = array(
+    '#type' => 'textfield',
+    //'#title' => t('Promo Code'),
+    '#place_hodler' => '*****',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+  return $form;
+}
+
+function saneable_subscriptions_promo_code_form_submit($form, &$form_state) {
+  $promo_code = $form_state['values']['promo_code'];
+  $response = saneable_subscriptions_check_promo_code($promo_code);
+  if($response['error_code'] < 0) {
+    drupal_set_message($response['message'], 'error');
+  } else {
+    drupal_set_message($response['message']);
+    drupal_goto('thank-you');
+  }
+}
+
+function saneable_subscriptions_create_order() {
+  global $user;
+  $product_id = SANEABLE_PRODUCT_ID;
+// Create the new order in checkout; you might also check first to
+// see if your user already has an order to use instead of a new one.
+  $order = commerce_cart_order_load($user->uid);
+  if (!$order) {
+    $order = commerce_order_new($user->uid, 'checkout_checkout');
+  }
+// Save the order to get its ID.
+  commerce_order_save($order);
+
+// Load whatever product represents the item the customer will be
+// paying for and create a line item for it.
+  $product = commerce_product_load($product_id);
+  $line_item = commerce_product_line_item_new($product, 1, $order->order_id);
+
+// Save the line item to get its ID.
+  commerce_line_item_save($line_item);
+
+// Add the line item to the order using fago's rockin' wrapper.
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $order_wrapper->commerce_line_items[] = $line_item;
+
+// Save the order again to update its line item reference field.
+  commerce_order_save($order);
+  return $order;
+}
+
+
+function saneable_subscriptions_check_promo_code($promo_code) {
+   global $user;
+  $response = array(
+    'error_code' => '',
+    'status' => 'Fail',
+    'message' => t('Something wrong.'),
+  );
+   if($user->uid == 0) {
+     $response['error_code'] = -1;
+     $response['message'] = t('You are not logged in.');
+     return $response;
+   }
+   
+  //$promo_code = $form_state['values']['promo_code'];
+  $code = commerce_coupon_load_by_code($promo_code);
+  if (!$code) {
+    //  drupal_set_message(t("Invalid promo code."));
+     $response['error_code'] = -2;
+     $response['message'] = t('The code you have entered is invalid.');
+    return $response;
+  }
+  // Already someone use.
+  if (!$code->is_active) {
+    // drupal_set_message(t("Your provided code is not active."));
+     $response['error_code'] = -3;
+     $response['message'] = t('Your provided code is not active.');
+    return $response;
+  }
+  $order = saneable_subscriptions_create_order();
+  if (commerce_coupon_code_is_valid($promo_code, $order)) {
+    // Active the licnse 
+    commerce_license_activate_order_licenses($order);
+   
+    $order->commerce_coupon_order_reference[LANGUAGE_NONE][]['target_id'] = $code->coupon_id;
+    commerce_order_save($order);
+    $code->field_user_uid[LANGUAGE_NONE][0]['value'] = $user->uid;
+    $code->field_user[LANGUAGE_NONE][0]['target_id'] = $user->uid;
+    $code->field_order_reference[LANGUAGE_NONE][0]['order_id'] = $order->order_id;
+    commerce_coupon_save($code);
+    // drupal_set_message('Congratulation! Your prom-code is successfully accepted.');
+     $response['error_code'] = 1;
+     $response['status'] = 'Pass';
+     $response['from'] = format_date(time(), 'case_date');
+     $response['to'] = format_date(strtotime('+1 years'), 'case_date');
+     $response['message'] = t('Congratulation! Your prom-code is successfully accepted.'); 
+    return $response;
+  }
+  else {
+     $response['error_code'] = -4;
+     $response['message'] = t('Sorry your prmo-code is invalid or expired.');
+   // drupal_set_message('Sorry your prmo-code is invalid or expired.');
+    return $response;
+  } 
+  $response['error_code'] = -5;
+  return $response;
+}

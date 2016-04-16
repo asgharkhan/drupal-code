@@ -1,0 +1,56 @@
+<?php
+
+/**
+  name = "number_cases"
+  description = "Number of Cases"
+  package = "custom"
+  core = "7.x"
+  version = "7.x-1.0"
+ */
+function saneable_case_limit_form_alter(&$form, &$form_state, $form_id) {
+  switch ($form_id) {
+    case 'case_node_form':
+      // Disable the case node form if the user submitted already three entries.
+      // If node edit form.
+      //watchdog('saneable_case_limit', 'yes calling 1' );
+      // watchdog('saneable_case_limit_2', '<pre>'.print_r($form_state['node'], true)."</pre>" );
+     if(isset($form_state['node']->nid)) {
+        return ;
+      }
+   //   watchdog('saneable_case_limit', 'yes calling 2' );
+      global $user;
+      $roles = array(4 => 'Trial', 6 => 'Trial Expired', 7 => 'Subscribed Expired');
+   //   drupal_set_message('<pre>'.print_r($user->roles, true)."</pre>");
+      if (array_intersect_key($roles, $user->roles)) {
+        $query = new EntityFieldQuery();
+        $entities = $query->entityCondition('entity_type', 'node')
+            ->entityCondition('bundle', 'case')
+            ->propertyCondition('uid', $user->uid)
+            ->execute();
+     //   watchdog('saneable_case_limit', 'yes calling 3' );
+        if (isset($entities['node'])) {
+          $numberofNodes = count($entities['node']);
+          if ($numberofNodes >= 3 && $user->uid != 1) {
+            $form['#disabled'] = TRUE;
+            drupal_set_message(t('Your trial period has expired. Please upgrade to create a new case.'), 'warning');
+          }
+        }
+      }
+      break;
+  }
+}
+
+function saneable_case_limit_node_insert($node) {
+  global $user;
+  $trial = user_has_role(4);
+  if ($trial) {
+    $cases = saneable_remaining_cases();
+    if ($cases['remaining_cases'] <= 0) {
+      $roles = $user->roles;
+      unset($roles[4]);
+      $roles[6] = t('Trial Expired User');
+      $user->roles = $roles;
+      user_save($user);
+    }
+  }
+}

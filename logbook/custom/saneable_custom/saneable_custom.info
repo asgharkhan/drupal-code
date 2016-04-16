@@ -1,0 +1,6 @@
+name = Saneable Custom
+description = Custom Module for Project Logbook
+package = Saneable Custom
+core = 7.x
+
+version = "7.x-dev"

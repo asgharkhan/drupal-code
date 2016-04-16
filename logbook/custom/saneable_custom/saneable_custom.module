@@ -1,0 +1,549 @@
+<?php
+
+/*
+ * Implements hook_email_registration_name().
+ */
+
+function saneable_custom_email_registration_name($edit, $account) {
+  return $account->mail;
+}
+
+/**
+ * Implement hook_date_popup_process_alter().
+ */
+function saneable_custom_date_popup_process_alter(&$element, &$form_state, &$context) {
+  $element['#datepicker_options'] = array(
+    'maxDate' => "+0D",
+  );
+  $element['date'] = date_popup_process_date_part($element);
+}
+
+/**
+ * Implements  hook_permission().
+ */
+function saneable_custom_permission() {
+  return array(
+    'choose plan' => array(
+      'title' => t('Choose plan page'),
+      'description' => t('Choose plan page permission.'),
+    ),
+  );
+}
+
+/**
+ * Implements  hook_menu().
+ */
+function saneable_custom_menu() {
+  $items = array();
+//  $items['choose-plan'] = array(
+//    'page callback' => 'saneable_custom_choose_plan_callback',
+//    'access arguments' => array('choose plan'),
+//  );
+//  
+  $items['subscribe/trial'] = array(
+    'page callback' => 'saneable_custom_select_trial_plan',
+    'type' => MENU_CALLBACK,
+    'access arguments' => array('choose plan'),
+  );
+  $items['repeat/previous'] = array(
+    'page callback' => 'saneable_custom_get_previous_values',
+    'type' => MENU_CALLBACK,
+    'access arguments' => array('access content'),
+  );
+
+  return $items;
+}
+
+function saneable_custom_get_previous_values() {
+  global $user;
+}
+
+function saneable_custom_select_trial_plan() {
+  global $user;
+  $trial = user_has_role(4);
+  $subscribe = user_has_role(5);
+  $expired = user_has_role(6);
+
+
+  if (!$expired && !$subscribe && !$expired) {
+    $flag = flag_get_flag('trial_user') or die('no "trial_user" flag defined');
+    $flag->flag('flag', $user->uid);
+    drupal_set_message(t('You have successfully choose the trial plan.'));
+  }
+  else {
+    drupal_set_message(t('You cannot choose the trial plan.'));
+  }
+
+  drupal_goto('/');
+  return;
+}
+
+//function saneable_custom_choose_plan_callback() {
+//  return array(
+//    '#theme' => 'choose_plan'
+//  );
+//}
+
+function saneable_custom_theme() {
+  $module_path = drupal_get_path('module', 'saneable_custom');
+  return array(
+    'success_message' => array(
+      'variables' => array('login' => NULL, 'message' => NULL, 'heading' => NULL),
+      'template' => 'success-message',
+      'path' => $module_path . '/templates',
+    )
+  );
+}
+
+//function saneable_custom_views_pre_render(&$view) {
+//  //drupal_set_message($view->name);
+// 
+//  if ($view->name == 'icons' && $view->current_display== 'block_4') {
+//     
+//    
+//    foreach ($view->result as $result) {
+//      // Replace all empty fields with the dash '-' character.
+//     // if(empty($result->field_field_image)) {
+//     //  dsm($result->field_field_image); 
+//       // $result->field_field_regular_job_count[0]['rendered']['#markup'] = '-';
+//     // }
+//    }
+//  }
+//}
+function saneable_custom_preprocess_views_view(&$vars) {
+  //dsm($vars);
+  $view = $vars['view'];
+  if ($view->name == 'icons' && $view->current_display == 'block_4') {
+    global $user;
+    // dsm($vars['rows']);
+    $vars['rows'] = str_replace('user_edit_url', 'user/' . $user->uid . '/edit', $vars['rows']);
+    // dsm($vars['rows']);
+  }
+  if ($view->name == 'current_plan' && ($view->current_display == 'panel_pane_1')) {
+    $cases = saneable_remaining_cases();
+    $vars['rows'] = str_replace('remaining_cases_token', $cases['remaining_cases'], $vars['rows']);
+  }
+
+  if ($view->name == 'current_plan' && ($view->current_display == 'panel_pane_2')) {
+    $remaining_days = saneable_custom_get_subscription_remaining_days();
+    //  dsm($remaining_days);
+    //  drupal_set_message("<pre>".print_r($remaining_days, true)."</pre>");
+    $vars['rows'] = str_replace('remaining_days_token', $remaining_days, $vars['rows']);
+  }
+}
+
+function saneable_custom_get_subscription_remaining_days() {
+  global $user;
+  if (user_has_role(7)) {
+    return 0;
+  }
+  $days = 0;
+  $expire = db_select('commerce_license', 'cl')
+          ->fields('cl', array('expires'))
+          ->condition('cl.uid', $user->uid)
+          ->condition('status', COMMERCE_LICENSE_ACTIVE)
+          ->orderBy('license_id', 'DESC')
+          ->execute()->fetchField();
+  if ($expire) {
+    $str = $expire - REQUEST_TIME;
+    $days = floor($str / 3600 / 24);
+    if ($days < 0) {
+      $days = 0;
+    }
+  }
+
+  return $days;
+}
+
+function saneable_custom_init() {
+  global $user;
+  if (arg(0) == 'user' && arg(2) == 'edit' && (count($user->roles) == 1)) {
+    drupal_goto('choose-plan');
+    return;
+  }
+
+  // drupal_add_js(drupal_get_path('module', 'saneable_custom').'/script/script.js');
+}
+
+function saneable_custom_field_formatter_info() {
+  return array(
+    'sanbeable_hms_format' => array(//Machine name of the formatter
+      'label' => t('Saneable HMS Format'),
+      'field types' => array('hms_field'), //This will only be available to text fields
+    ),
+  );
+}
+
+function saneable_custom_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  // watchdog('saneable_hms_format', "<pre>" . print_r($display['type'], true) . "</pre>");
+  if ($display['type'] == 'sanbeable_hms_format') {
+    foreach ($items as $delta => $item) {
+      // $element[$delta]['#theme'] = 'hms';
+      $element[$delta]['#markup'] = _hms_seconds_to_formatted($item['value']);
+      //   $element[$delta]['#format'] = $display['settings']['format'];
+      //  $element[$delta]['#leading_zero'] = $display['settings']['leading_zero'];
+    }
+  }
+  return $element;
+}
+
+function saneable_custom_multiple_field_remove_button_field_widgets_alter(&$fieldwidgets) {
+  // drupal_set_message("<pre>".print_r($fieldwidgets, true)."</pre>");
+  $fieldwidgets[] = 'term_hierarchy';
+}
+
+/**
+ *  Override -onone option
+ */
+//function saneable_custom_preprocess_options_none($variables) {
+//  $instance = $variables['instance'];
+//  $option = $variables['option'];
+// //  watchdog('alter_select', "<pre> Yes ".print_r(array_keys($variables), true)."</pre>");
+// //  watchdog('alter_select', "<pre> Instance ".print_r($instance, true)."</pre>");
+//  // watchdog('alter_select', "<pre> Option ".print_r($option, true)."</pre>");
+//    $output = t('-Select-');
+//   // if($instance['field_name'] == '')
+//
+//  return $output;
+//}
+
+/**
+ * Alter forms
+ */
+function saneable_custom_form_alter(&$form, &$form_state, $form_id) {
+  // Change Email to Client string on password reset form.
+
+  if ($form_id == "case_node_form") {
+    //$form['#attached']['library'][] = array('bootstrap_select', 'bootstrap_select');
+   // drupal_add_library('bootstrap_select', 'bootstrap_select');
+//    foreach($form['field_anaesthetic']['und'] as &$anaesthetic ) {
+//         watchdog('alter_select', "<pre>".print_r($anaesthetic, true)."</pre>");
+//
+//    }
+   //drupal_set_message();
+    //$form['#attached']['library'][] = array('bootstrap_select', 'bootstrap_select');
+   //$library = libraries_load('bootstrap_select', $variant = NULL);
+    //drupal_set_message('<pre>'.print_r($library, true)."</pre>");
+//    $form['notification_email']['#attached']['js'][] = array(
+//      'data' => 'https://raw.githubusercontent.com/adamcoulombe/jquery.customSelect/master/jquery.customSelect.min.js',
+//      'type' => 'external'
+//    );
+    //$form['#attached']['css'][] = drupal_get_path('module', 'saneable_custom') . '/chosen/chosen.css';
+
+    //$form['#attached']['js'][] = drupal_get_path('module', 'saneable_custom') . '/chosen/chosen.jquery.js';
+    
+    $form['#attached']['js'][] = drupal_get_path('module', 'saneable_custom') . '/script/script.js';
+    $node = $form_state['node'];
+    $form['hidden_title'] = array('#type' => 'hidden', '#value' => $node->title);
+  }
+
+  if ($form_id == 'user_pass') {
+    $form['name']['#title'] = t('Enter your email address to reset your password.');
+    // drupal_set_message("<pre>".print_r($form, true)."</pre>");
+    if (isset($form_state['values']['success'])) {
+      unset($form['name']);
+      unset($form['actions']);
+      $block = module_invoke('views', 'block_view', 'icons-block_5');
+      //  watchdog('reset_succes_message', "<pre>" . print_r($form_state['values'], true) . "</pre>");
+      $form['success_message'] = array(
+        '#theme' => 'success_message',
+        '#login' => render($block['content']),
+        '#message' => "Your new password has been sent to: <strong>".$form_state['values']['name']."</strong> ",
+          //  '#heading' => t('Registration Complete'),
+      );
+      return $form;
+    }
+    $form['success']['#value'] = NULL;
+    $form['#submit'][] = 'saneable_custom_form_submit_callback';
+    $form['#redirect'] = 'user/password';
+    $form['#after_build'][] = 'saneable_custom_after_rebuild_user_register';
+  }
+  if ($form_id == "user_register_form") {
+//      $form['success_message'] = array(
+//      //'#theme' => 'success_message',
+//      '#markup' => render($block['content']),
+//    );
+    if (isset($form_state['values']['success'])) {
+      $form['account'] = array();
+      $form['actions'] = array();
+      $form['field_name'] = array();
+      $form['field_surname'] = array();
+      $block = module_invoke('views', 'block_view', 'icons-block_5');
+      // watchdog('registeration_succes_message', "<pre>".print_r($form_state['values']['mail'], true)."</pre>");
+      $form['success_message'] = array(
+        '#theme' => 'success_message',
+        '#login' => render($block['content']),
+        '#message' => "A confirmation email has been sent to: <strong>".$form_state['values']['mail']."</strong>",
+        '#heading' => t('Registration Complete'),
+      );
+      return $form;
+    }
+    $form['success']['#value'] = NULL;
+    $form['#submit'][] = 'saneable_custom_form_submit_callback';
+    $form['#redirect'] = 'user/register';
+    $form['#after_build'][] = 'saneable_custom_after_rebuild_user_register';
+    // drupal_set_message("<pre>".print_r($form, true)."</pre>");
+  }
+  if ($form_id == "user_profile_form") {
+    drupal_add_js(drupal_geT_path('module', 'saneable_custom') . '/script/user_edit.js');
+    $form['#after_build'][] = 'saneable_custom_after_rebuild_user_profile';
+  }
+}
+
+function saneable_custom_form_submit_callback($form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+  form_set_value($form['success'], TRUE, $form_state);
+}
+
+function saneable_custom_after_rebuild_user_profile($form, &$form_state) {
+  $form['account']['current_pass']['#title'] = t('Password');
+  $form['account']['pass']['pass1']['#title'] = t('New Password');
+  $form['account']['pass']['pass2']['#title'] = t('Confirm New Password');
+  $form['account']['mail']['#title'] = t('Email');
+  $form['account']['mail']['#weight'] = -9;
+
+  return $form;
+}
+
+function saneable_custom_after_rebuild_user_register($form, &$form_state) {
+  $form['account']['pass']['pass1']['#title'] = t('Choose Password');
+  $form['account']['pass']['pass2']['#title'] = t('Confirm Password');
+  $form['account']['mail']['#title'] = t('Email');
+  $form['account']['conf_mail']['#title'] = t('Confirm Email');
+  //drupal_set_message("<pre>".print_r(array_keys($form['account']['pass']['pass1']['#title']), true)."</pre>");
+  //drupal_set_message("<pre>".print_r($form['account']['pass']['pass1']['#title'], true)."</pre>");
+  return $form;
+//drupal_set_message("<pre>".print_r(array_keys($form['account']), true)."</pre>");
+}
+
+// Create blocks.
+/**
+ * Implements hook_block_info().
+ */
+function saneable_custom_block_info() {
+  $blocks = array();
+
+  $blocks['saneable_custom_days'] = array(
+    'info' => t('Number of days remaining'),
+  );
+  $blocks['saneable_custom_expire'] = array(
+    'info' => t('Number of days expire alert message'),
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function saneable_custom_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'saneable_custom_days':
+      $block['subject'] = '';
+      $block['content'] = saneable_custom_block_number_days_callback();
+      break;
+    case 'saneable_custom_expire':
+      $block['subject'] = '';
+      $days = saneable_custom_get_subscription_remaining_days();
+      if ($days <= 30) {
+        $block['content'] = saneable_custom_block_number_days_callback();
+      }
+      else {
+        $block['content'] = FALSE;
+      }
+      break;
+  }
+
+  return $block;
+}
+
+function saneable_custom_block_number_days_callback() {
+  global $user;
+  $trial = array(5 => t('Subscribed User'), 7 => t('Subscribed Expired'));
+ // $test = array_intersect_key($trial, $user->roles);
+ // drupal_set_message("<pre>".print_r($user->roles, true)."</pre>");
+  // drupal_set_message("<pre>".print_r($test, true)."</pre>");
+  // drupal_set_message("<pre>".print_r($test, true)."</pre>");
+  if (array_intersect_key($trial, $user->roles)) {
+    $days = saneable_custom_get_subscription_remaining_days();
+    $day_text = '<span class="days">' . $days . '</span>';
+    $day_type = 'days';
+    if ($days <= 0) {
+      $day_text = '<span class="zero-day red days">0</span>';
+    }
+    if ($days <= 1) {
+      $day_type = 'day';
+    }
+    $message = "<p> <b>$day_text</b> $day_type remaining on your subscription</p>";
+  }
+  else {
+    $cases = saneable_remaining_cases();
+    $remaining_cases = $cases['remaining_cases'];
+   // drupal_set_message("<pre>".print_r($remaining_cases, true)."</pre>");
+    $case_text = '<span class="days">' . $remaining_cases . '</span>';
+    $case_type = 'cases';
+    if ($remaining_cases <= 0) {
+      $case_text = '<span class="zero-day red days">0</span>';
+    }
+    if ($remaining_cases <= 1) {
+      $case_type = 'case';
+    }
+    // 3 cases 
+    $message = "<p> <b>$case_text</b> $case_type remaining in your trial</p>";
+  }
+
+
+  $content = array(
+    '#markup' => $message
+  );
+
+  return $content;
+}
+
+function saneable_custom_node_insert($node) {
+
+  // drupal_set_message($node->nid);
+  if ($node->type == 'case') {
+    saneable_custom_unpublish_case($node);
+  }
+}
+
+function saneable_custom_node_update($node) {
+  if ($node->type == 'case') {
+  saneable_custom_unpublish_case($node);
+  }
+}
+
+ function saneable_custom_node_presave($node) {
+  if ($node->type == 'case') {
+    $data = array(
+      'field_age',
+      'field_sex',      
+  //    'field_date',
+      'field_start',
+      'field_end',
+      'field_location',
+      'field_speciality',
+      'field_anaesthetic',
+      'field_procedure'
+    );
+    foreach ($data as $key => $value) {
+      $field_value = field_get_items('node', $node, $value);
+      if (empty($field_value)) {
+        //  drupal_set_message($value);
+        //  drupal_set_message("<pre>".print_r($node, true)."</pre>");
+        // Update node table.
+        $status = 0;
+        break;
+        // return;
+      }
+      else {
+        $status = 1;
+      }
+    }
+    $node->status = $status;
+  }
+}
+
+function saneable_custom_unpublish_case($node) {
+  // drupal_set_message("Unpublished");
+  $data = array(
+    'field_age',
+    'field_sex',    
+  //  'field_date',
+    'field_start',
+    'field_end',
+    'field_location',
+    'field_anaesthetic',
+    'field_procedure'
+  );
+  
+    $digits = 10;
+    $title = str_pad($node->nid, $digits, '0', STR_PAD_LEFT);
+    // Update node table.
+    db_update('node')
+        ->fields(array(
+          'title' => $title,
+        ))
+        ->condition('nid', $node->nid)
+        ->execute();
+    // Update node revision table.
+    db_update('node_revision')
+        ->fields(array(
+          'title' => $title,
+        ))
+        ->condition('vid', $node->vid)
+        ->execute();
+  
+  foreach ($data as $key => $value) {
+    $field_value = field_get_items('node', $node, $value);
+    if (empty($field_value)) {
+      //  drupal_set_message($value);
+      //  drupal_set_message("<pre>".print_r($node, true)."</pre>");
+      // Update node table.
+      $status = 0;
+      break ;
+     // return;
+    } else {
+      $status = 1;
+    } 
+  }
+  
+  // Check speciality field as operation. 
+  if($status) {
+    $field_value = field_get_items('node', $node, 'field_speciality');
+    if($field_value) {
+      if($field_value[0]['parent'] == $field_value[0]['tid']) {
+        $status = 0;
+      } 
+    }
+  //  watchdog('node_speciality_unpublish', "<pre>".print_r($field_value, true)."</pre>");
+  }
+  db_update('node')
+          ->fields(array(
+            'status' => $status,
+          ))
+          ->condition('nid', $node->nid)
+          ->execute();
+      // Update node revision table.
+      db_update('node_revision')
+          ->fields(array(
+            'status' => $status,
+          ))
+          ->condition('vid', $node->vid)
+          ->execute();
+}
+
+// function saneable_custom_commerce_currency_info_alter(&$currencies, $langcode) {
+////  $currencies['EUR']['decimals'] = 0;
+////  $currencies['GBP']['decimals'] = 0;
+////  $currencies['USD']['decimals'] = 0;
+//}
+
+/**
+ * Implementation hook_commerce_currency_info_alter()
+ */
+function saneable_custom_views_pre_render(&$view) {
+  if($view->name == 'export' && $view->current_display == 'views_data_export_1') {
+    $min = $view->exposed_raw_input['created']['min'];
+    $max = $view->exposed_raw_input['created']['max'];
+    $view->style_plugin->options['filename'] = $min . ' -- ' . $max . '.csv';
+  }
+}
+
+function saneable_custom_field_formatter_info_alter(&$info) {
+    $info['image']['field types'][] = 'file';
+}   
+/**
+ * Check term has parent.
+ */
+function saneable_custom_check_has_parent($tid) {
+  $check = db_query('Select parent from {taxonomy_term_hierarchy} where tid = :tid', array(':tid' => $tid))->fetchField();
+  if($check) {
+    return TRUE;
+  }
+  
+  return FALSE;
+}
